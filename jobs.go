@@ -73,7 +73,7 @@ func extractJob(s *goquery.Selection) job {
 	location = cleanString(location)
 	salary := cleanString(s.Find(".salaryText").Text())
 	summary := cleanString(s.Find(".summary").Text())
-	return job{id: id, title: title, location: location, salary: salary, summary: summary}
+	return job{id: "https://www.indeed.com/viewjob?jk=" + id, title: title, location: location, salary: salary, summary: summary}
 }
 
 func cleanString(toClean string) string {
@@ -87,7 +87,7 @@ func writeJobs() {
 	w := csv.NewWriter(file)
 	defer w.Flush()
 
-	headers := []string{"id", "title", "location", "salary", "summary"}
+	headers := []string{"apply", "title", "location", "salary", "summary"}
 	writeErr := w.Write(headers)
 	checkError(writeErr)
 
