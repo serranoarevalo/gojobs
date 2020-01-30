@@ -46,7 +46,7 @@ func main() {
 func getPage(number int, mainChannel chan []job) {
 	var jobs []job
 	pageURL := baseURL + "&start=" + strconv.Itoa(number*50)
-	fmt.Println("Requesting", pageURL)
+	fmt.Println("Scrapping Indeed: Page", number)
 	res, err := http.Get(pageURL)
 	checkError(err)
 	checkStatusCode(res)
