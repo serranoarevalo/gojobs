@@ -91,6 +91,12 @@ func writeJobs() {
 	writeErr := w.Write(headers)
 	checkError(writeErr)
 
+	for _, job := range jobs {
+		jobCSV := []string{job.id, job.title, job.location, job.salary, job.summary}
+		writeErr := w.Write(jobCSV)
+		checkError(writeErr)
+	}
+
 }
 
 func checkError(err error) {

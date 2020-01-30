@@ -1,3 +1,3 @@
 # Gojobs
 
-Simple Indeed Scrapper built with Go, goquery and colly
+Simple Indeed Scrapper built with Go and goQuery
