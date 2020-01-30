@@ -22,16 +22,62 @@ type job struct {
 
 const baseURL string = "https://kr.indeed.com/jobs?q=python&limit=50"
 
-var jobs []job
-
 func main() {
+	var jobs []job
+	c := make(chan []job)
+
 	totalPages := getPages()
 	fmt.Println("Extracted", totalPages, "pages")
+
 	for i := 0; i < totalPages; i++ {
-		getPage(i)
+		go getPage(i, c)
 	}
+
+	for i := 0; i < totalPages; i++ {
+		pageJobs := <-c
+		jobs = append(jobs, pageJobs...)
+	}
+
 	fmt.Println("Writting", len(jobs), "jobs")
-	writeJobs()
+	writeJobs(jobs)
+	fmt.Println("Done")
+}
+
+func getPage(number int, mainChannel chan []job) {
+	var jobs []job
+	pageURL := baseURL + "&start=" + strconv.Itoa(number*50)
+	fmt.Println("Requesting", pageURL)
+	res, err := http.Get(pageURL)
+	checkError(err)
+	checkStatusCode(res)
+
+	doc, err := goquery.NewDocumentFromReader(res.Body)
+	checkError(err)
+
+	innerChannel := make(chan job)
+
+	searchCards := doc.Find(".jobsearch-SerpJobCard")
+
+	searchCards.Each(func(index int, s *goquery.Selection) {
+		go extractJob(s, innerChannel)
+	})
+
+	for i := 0; i < searchCards.Length(); i++ {
+		extracted := <-innerChannel
+		jobs = append(jobs, extracted)
+	}
+	mainChannel <- jobs
+}
+
+func extractJob(s *goquery.Selection, c chan job) {
+	id, _ := s.Attr("data-jk")
+	title, _ := s.Find(".title>a").Attr("title")
+	title = cleanString(title)
+	location := s.Find(".sjcl").Text()
+	location = cleanString(location)
+	salary := cleanString(s.Find(".salaryText").Text())
+	summary := cleanString(s.Find(".summary").Text())
+	c <- job{id: "https://www.indeed.com/viewjob?jk=" + id, title: title, location: location, salary: salary, summary: summary}
 }
 
 func getPages() int {
@@ -51,36 +97,11 @@ func getPages() int {
 	return pages
 }
 
-func getPage(number int) {
-	pageURL := baseURL + "&start=" + strconv.Itoa(number*50)
-	res, err := http.Get(pageURL)
-	checkError(err)
-	checkStatusCode(res)
-
-	doc, err := goquery.NewDocumentFromReader(res.Body)
-	checkError(err)
-
-	doc.Find(".jobsearch-SerpJobCard").Each(func(index int, s *goquery.Selection) {
-		jobs = append(jobs, extractJob(s))
-	})
-}
-
-func extractJob(s *goquery.Selection) job {
-	id, _ := s.Attr("data-jk")
-	title, _ := s.Find(".title>a").Attr("title")
-	title = cleanString(title)
-	location := s.Find(".sjcl").Text()
-	location = cleanString(location)
-	salary := cleanString(s.Find(".salaryText").Text())
-	summary := cleanString(s.Find(".summary").Text())
-	return job{id: "https://www.indeed.com/viewjob?jk=" + id, title: title, location: location, salary: salary, summary: summary}
-}
-
 func cleanString(toClean string) string {
 	return strings.Join(strings.Fields(strings.TrimSpace(toClean)), " ")
 }
 
-func writeJobs() {
+func writeJobs(jobs []job) {
 	file, err := os.Create("jobs.csv")
 	checkError(err)
 
