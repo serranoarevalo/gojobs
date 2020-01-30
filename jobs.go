@@ -20,12 +20,15 @@ type job struct {
 
 const baseURL string = "https://kr.indeed.com/jobs?q=python&limit=50"
 
+var jobs []job
+
 func main() {
 	totalPages := getPages()
 	fmt.Println("Total pages", totalPages)
 	for i := 0; i < totalPages; i++ {
 		getPage(i)
 	}
+	fmt.Println(len(jobs))
 }
 
 func getPages() int {
@@ -66,11 +69,21 @@ func getPage(number int) {
 		log.Fatal(err)
 	}
 	doc.Find(".jobsearch-SerpJobCard").Each(func(index int, s *goquery.Selection) {
-		id, _ := s.Attr("data-jk")
-		title, _ := s.Find(".title>a").Attr("title")
-		title = strings.TrimSpace(title)
-		location := s.Find(".sjcl").Text()
-		location = strings.Join(strings.Fields(strings.TrimSpace(location)), " ")
-		fmt.Println(job{id: id, title: title, location: location})
+		jobs = append(jobs, extractJob(s))
 	})
+}
+
+func extractJob(s *goquery.Selection) job {
+	id, _ := s.Attr("data-jk")
+	title, _ := s.Find(".title>a").Attr("title")
+	title = cleanString(title)
+	location := s.Find(".sjcl").Text()
+	location = cleanString(location)
+	salary := cleanString(s.Find(".salaryText").Text())
+	summary := cleanString(s.Find(".summary").Text())
+	return job{id: id, title: title, location: location, salary: salary, summary: summary}
+}
+
+func cleanString(toClean string) string {
+	return strings.Join(strings.Fields(strings.TrimSpace(toClean)), " ")
 }
