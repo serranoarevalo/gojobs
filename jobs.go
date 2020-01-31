@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/labstack/echo"
 )
 
 type job struct {
@@ -20,32 +21,50 @@ type job struct {
 	summary  string
 }
 
-const baseURL string = "https://kr.indeed.com/jobs?q=python&limit=50"
+func renderHome(c echo.Context) error {
+	return c.File("index.html")
+}
+
+func handleScrape(c echo.Context) error {
+	term := c.FormValue("term")
+	term = strings.ToLower(term)
+	jobs := scrapeJob(term)
+	err := writeJobs(jobs)
+	if err == nil {
+
+	}
+	return c.String(http.StatusOK, term)
+}
 
 func main() {
+	e := echo.New()
+	e.GET("/", renderHome)
+	e.POST("/scrape", handleScrape)
+	e.Logger.Fatal(e.Start(":8080"))
+}
+
+func scrapeJob(term string) []job {
+	baseURL := "https://kr.indeed.com/jobs?q=" + term + "&limit=50"
 	var jobs []job
 	c := make(chan []job)
 
-	totalPages := getPages()
+	totalPages := getPages(baseURL)
 	fmt.Println("Extracted", totalPages, "pages")
 
 	for i := 0; i < totalPages; i++ {
-		go getPage(i, c)
+		go getPage(i, c, baseURL)
 	}
 
 	for i := 0; i < totalPages; i++ {
 		pageJobs := <-c
 		jobs = append(jobs, pageJobs...)
 	}
-
-	fmt.Println("Writting", len(jobs), "jobs")
-	writeJobs(jobs)
-	fmt.Println("Done")
+	return jobs
 }
 
-func getPage(number int, mainChannel chan []job) {
+func getPage(number int, mainChannel chan []job, url string) {
 	var jobs []job
-	pageURL := baseURL + "&start=" + strconv.Itoa(number*50)
+	pageURL := url + "&start=" + strconv.Itoa(number*50)
 	fmt.Println("Scrapping Indeed: Page", number)
 	res, err := http.Get(pageURL)
 	checkError(err)
@@ -80,9 +99,9 @@ func extractJob(s *goquery.Selection, c chan job) {
 	c <- job{id: "https://www.indeed.com/viewjob?jk=" + id, title: title, location: location, salary: salary, summary: summary}
 }
 
-func getPages() int {
+func getPages(url string) int {
 	pages := 0
-	res, err := http.Get(baseURL)
+	res, err := http.Get(url)
 	checkError(err)
 	checkStatusCode(res)
 
@@ -101,7 +120,7 @@ func cleanString(toClean string) string {
 	return strings.Join(strings.Fields(strings.TrimSpace(toClean)), " ")
 }
 
-func writeJobs(jobs []job) {
+func writeJobs(jobs []job) error {
 	file, err := os.Create("jobs.csv")
 	checkError(err)
 
@@ -117,6 +136,8 @@ func writeJobs(jobs []job) {
 		writeErr := w.Write(jobCSV)
 		checkError(writeErr)
 	}
+
+	return nil
 
 }
 
