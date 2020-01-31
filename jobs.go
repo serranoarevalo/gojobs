@@ -26,14 +26,12 @@ func renderHome(c echo.Context) error {
 }
 
 func handleScrape(c echo.Context) error {
+	defer os.Remove("jobs.csv")
 	term := c.FormValue("term")
 	term = strings.ToLower(term)
 	jobs := scrapeJob(term)
-	err := writeJobs(jobs)
-	if err == nil {
-
-	}
-	return c.String(http.StatusOK, term)
+	writeJobs(jobs)
+	return c.Attachment("jobs.csv", "jobs.csv")
 }
 
 func main() {
@@ -120,7 +118,7 @@ func cleanString(toClean string) string {
 	return strings.Join(strings.Fields(strings.TrimSpace(toClean)), " ")
 }
 
-func writeJobs(jobs []job) error {
+func writeJobs(jobs []job) {
 	file, err := os.Create("jobs.csv")
 	checkError(err)
 
@@ -136,9 +134,6 @@ func writeJobs(jobs []job) error {
 		writeErr := w.Write(jobCSV)
 		checkError(writeErr)
 	}
-
-	return nil
-
 }
 
 func checkError(err error) {
